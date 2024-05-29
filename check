@@ -1,0 +1,71 @@
+import numpy as np
+import pandas as pd
+import torch
+import os
+import re
+import shutil
+import torch.nn as nn
+import torchvision.transforms as transforms
+from PIL import Image
+from torch.utils.data import DataLoader, Dataset
+from tqdm.auto import tqdm
+import random
+from torchvision.models import swin_v2_t, Swin_V2_T_Weights
+# Define the classifier model
+class Classifier(nn.Module):
+    def __init__(self):
+        super(Classifier, self).__init__()
+        self.model = swin_v2_t(weights=Swin_V2_T_Weights.IMAGENET1K_V1)
+        self.model.num_classes = 2 # len(family_dict)
+        
+    
+    def forward(self, x):
+        return self.model(x)
+# Transform images into same size
+imSize = 256
+std_tfm = transforms.Compose([
+    transforms.Resize((imSize, imSize)),
+    transforms.Grayscale(num_output_channels=3),
+    transforms.ToTensor(),
+])
+def predict_single_image(model, image_path, device):
+    # Open the image
+    image = Image.open(image_path)
+    
+    # Preprocess the image
+    image = std_tfm(image)
+    
+    # Add batch dimension
+    image = image.unsqueeze(0)
+    
+    # Move the image to the specified device
+    image = image.to(device)
+    
+    # Use torch.no_grad() to speed up the inference process
+    with torch.no_grad():
+        logits = model(image)
+    
+    # Compute the prediction result
+    predicted_label = logits.argmax(dim=-1).item()
+    
+    return predicted_label
+
+# Specify the device (CPU or GPU).
+# Must turn on the GPU!!!
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+# The path of the model
+model_path = 'C:\Course\Information_Security\Final\swin_v2_t_best.ckpt'
+
+best_model = Classifier().to(device)
+
+best_model.load_state_dict(torch.load(model_path))
+
+best_model.eval()
+
+# Load a single image and make a prediction
+image_path = 'C:\Course\Information_Security\Final\images-20240528T084417Z-001.zip'       # The path of yout image!
+predicted_label = predict_single_image(best_model, image_path, device)
+
+# Print the prediction result
+print(f'The predicted label for the image is: {predicted_label}')
